@@ -4,11 +4,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - "api/pom.xml"
-      - "api/.mvn/**"
-      - ".github/dependabot.yml"
-      - ".github/workflows/**"
 
 permissions:
   contents: read
@@ -26,8 +21,27 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Determine whether dependency review is required
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE '^(api/pom\.xml$|api/\.mvn/|\.github/dependabot\.yml$|\.github/workflows/)'; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Not required for these changes
+        if: steps.scope.outputs.required == 'false'
+        run: echo "Dependency review is not required because this pull request does not change dependency configuration or workflows."
 
       - name: Review dependency changes
+        if: steps.scope.outputs.required == 'true'
         uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: high
