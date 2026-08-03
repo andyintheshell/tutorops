@@ -32,3 +32,19 @@ Public endpoints:
 
 - `GET /api/public/status`
 - `GET /actuator/health`
+
+## Security and supply-chain controls
+
+TutorOps uses automated security controls throughout the development workflow:
+
+| Control                       | Implementation                                       |
+| ----------------------------- | ---------------------------------------------------- |
+| Build and test                | Java 21, Maven and GitHub Actions                    |
+| Static analysis               | CodeQL SAST with extended security queries           |
+| Dependency governance         | Dependabot and pull-request dependency review        |
+| Software composition analysis | Trivy vulnerability scanning                         |
+| Secret detection              | Gitleaks across pull requests and repository history |
+| Software bill of materials    | CycloneDX SBOM generated during Maven builds         |
+| Merge protection              | Required pull requests and security status checks    |
+
+See [`docs/security-pipeline.md`](docs/security-pipeline.md) for enforcement thresholds, finding triage, exceptions, and deferred controls. Security concerns can be reported according to [`SECURITY.md`](SECURITY.md).
