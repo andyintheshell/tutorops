@@ -28,3 +28,4 @@ replay_pid*
 *.iml
 **/target/
 .env
+web/.env
