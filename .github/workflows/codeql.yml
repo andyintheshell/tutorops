@@ -4,9 +4,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - "api/**"
-      - ".github/workflows/codeql.yml"
   push:
     branches:
       - main
@@ -33,9 +30,34 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Determine whether CodeQL is required
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE '^(api/|\.github/workflows/codeql\.yml$)'; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Not required for these changes
+        if: steps.scope.outputs.required == 'false'
+        run: echo "CodeQL is not required because this pull request does not change the API or CodeQL workflow."
 
       - name: Set up Java 21
+        if: steps.scope.outputs.required == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -44,6 +66,7 @@ jobs:
           cache-dependency-path: api/pom.xml
 
       - name: Initialize CodeQL
+        if: steps.scope.outputs.required == 'true'
         uses: github/codeql-action/init@v4
         with:
           languages: java-kotlin
@@ -51,6 +74,7 @@ jobs:
           queries: security-extended
 
       - name: Build application for analysis
+        if: steps.scope.outputs.required == 'true'
         working-directory: api
         run: |
           chmod +x mvnw
@@ -61,6 +85,7 @@ jobs:
             clean package
 
       - name: Analyze application
+        if: steps.scope.outputs.required == 'true'
         uses: github/codeql-action/analyze@v4
         with:
           category: /language:java-kotlin
