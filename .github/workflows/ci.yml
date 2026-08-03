@@ -50,6 +50,14 @@ jobs:
       - name: Verify application
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
 
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom
+          path: api/target/bom.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload test reports after failure
         if: failure()
         uses: actions/upload-artifact@v7
