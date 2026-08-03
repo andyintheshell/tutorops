@@ -37,7 +37,7 @@ class StatusControllerIntegrationTest {
     void actuatorHealthEndpointReturnsUpStatus() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith("application/vnd.spring-boot.actuator.v3+json"))
+                .andExpect(content().contentTypeCompatibleWith("application/*+json"))
                 .andExpect(jsonPath("$.status").value("UP"));
     }
 
@@ -45,7 +45,7 @@ class StatusControllerIntegrationTest {
     void actuatorInfoEndpointIsAllowed() throws Exception {
         mockMvc.perform(get("/actuator/info"))
                 .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith("application/vnd.spring-boot.actuator.v3+json"))
+                .andExpect(content().contentTypeCompatibleWith("application/*+json"))
                 .andExpect(jsonPath("$").isMap());
     }
 

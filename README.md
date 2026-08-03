@@ -18,7 +18,7 @@ Run tests:
 
 ```bash
 cd api
-./mvnw test
+./mvnw verify
 ```
 
 Public endpoints:
