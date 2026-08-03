@@ -1,6 +1,13 @@
 spring:
   application:
     name: tutorops-api
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${TUTOROPS_OIDC_ISSUER:http://localhost:8081/realms/tutorops}
+          audiences:
+            - ${TUTOROPS_OIDC_AUDIENCE:tutorops-api}
 
 management:
   endpoints:
@@ -15,3 +22,10 @@ server:
   error:
     include-message: never
     include-stacktrace: never
+
+tutorops:
+  security:
+    oidc:
+      api-client-id: ${TUTOROPS_OIDC_API_CLIENT_ID:tutorops-api}
+    cors:
+      allowed-origin: ${TUTOROPS_CORS_ALLOWED_ORIGIN:http://localhost:5173}

@@ -9,6 +9,7 @@ on:
       - main
     paths:
       - "api/**"
+      - "web/**"
       - ".github/workflows/ci.yml"
   workflow_dispatch:
 
@@ -34,6 +35,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Determine whether CI is required
         id: scope
@@ -48,7 +50,7 @@ jobs:
             exit 0
           fi
 
-          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE '^(api/|\.github/workflows/ci\.yml$)'; then
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE '^(api/|web/|\.github/workflows/ci\.yml$)'; then
             echo "required=true" >> "$GITHUB_OUTPUT"
           else
             echo "required=false" >> "$GITHUB_OUTPUT"
@@ -57,7 +59,7 @@ jobs:
       - name: Not required for these changes
         if: steps.scope.outputs.required == 'false'
         working-directory: .
-        run: echo "CI is not required because this pull request does not change the API or CI workflow."
+        run: echo "CI is not required because this pull request does not change the API, frontend, or CI workflow."
 
       - name: Set up Java 21
         if: steps.scope.outputs.required == 'true'
@@ -95,3 +97,60 @@ jobs:
             api/target/failsafe-reports/
           if-no-files-found: ignore
           retention-days: 7
+
+  frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine whether frontend CI is required
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE '^(web/|\.github/workflows/ci\.yml$)'; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Not required for these changes
+        if: steps.scope.outputs.required == 'false'
+        run: echo "Frontend CI is not required because this pull request does not change the frontend or CI workflow."
+
+      - name: Set up Node.js 22
+        if: steps.scope.outputs.required == 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        if: steps.scope.outputs.required == 'true'
+        working-directory: web
+        run: npm ci
+
+      - name: Lint frontend
+        if: steps.scope.outputs.required == 'true'
+        working-directory: web
+        run: npm run lint
+
+      - name: Build frontend
+        if: steps.scope.outputs.required == 'true'
+        working-directory: web
+        run: npm run build
