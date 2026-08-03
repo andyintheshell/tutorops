@@ -20,21 +20,21 @@ class KeycloakClientRoleConverterTest {
         Jwt jwt = jwt(Map.of(
                 "scope", "openid profile",
                 "resource_access", Map.of(
-                        "tutorops-api", Map.of("roles", List.of("tutor", "admin")))));
+                        "tutorops-api", Map.of("roles", List.of("TUTOR", "ADMIN")))));
 
         assertThat(converter.convert(jwt))
                 .containsExactlyInAnyOrder(
                         new SimpleGrantedAuthority("SCOPE_openid"),
                         new SimpleGrantedAuthority("SCOPE_profile"),
-                        new SimpleGrantedAuthority("ROLE_tutor"),
-                        new SimpleGrantedAuthority("ROLE_admin"));
+                        new SimpleGrantedAuthority("ROLE_TUTOR"),
+                        new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 
     @Test
     void ignoresRolesForOtherClients() {
         Jwt jwt = jwt(Map.of(
                 "resource_access", Map.of(
-                        "another-client", Map.of("roles", List.of("admin")))));
+                        "another-client", Map.of("roles", List.of("ADMIN")))));
 
         assertThat(converter.convert(jwt)).isEmpty();
     }

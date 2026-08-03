@@ -34,9 +34,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/public/**", "/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/me").authenticated()
-                        .requestMatchers("/api/tutor/**").hasRole("tutor")
-                        .requestMatchers("/api/student/**").hasRole("student")
-                        .requestMatchers("/api/admin/**").hasRole("admin")
+                        .requestMatchers("/api/tutor/**").hasRole("TUTOR")
+                        .requestMatchers("/api/student/**").hasRole("STUDENT")
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().denyAll())
                 .cors(Customizer.withDefaults())
                 .oauth2ResourceServer(oauth2 -> oauth2

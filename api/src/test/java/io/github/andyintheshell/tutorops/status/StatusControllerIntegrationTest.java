@@ -75,7 +75,7 @@ class StatusControllerIntegrationTest {
         mockMvc.perform(get("/api/me")
                         .with(SecurityMockMvcRequestPostProcessors.authentication(
                                 new JwtAuthenticationToken(currentUserJwt(),
-                                        List.of(new SimpleGrantedAuthority("ROLE_tutor"))))))
+                                        List.of(new SimpleGrantedAuthority("ROLE_TUTOR"))))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("user-123"))
                 .andExpect(jsonPath("$.username").value("alex"))
@@ -83,7 +83,7 @@ class StatusControllerIntegrationTest {
                 .andExpect(jsonPath("$.firstName").value("Alex"))
                 .andExpect(jsonPath("$.lastName").value("Example"))
                 .andExpect(jsonPath("$.roles").isArray())
-                .andExpect(jsonPath("$.roles[0]").value("tutor"));
+                .andExpect(jsonPath("$.roles[0]").value("TUTOR"));
     }
 
     private Jwt currentUserJwt() {
@@ -104,7 +104,7 @@ class StatusControllerIntegrationTest {
     void tutorEndpointAllowsTutorRole() throws Exception {
         mockMvc.perform(get("/api/tutor/example")
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
-                                .authorities(new SimpleGrantedAuthority("ROLE_tutor"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_TUTOR"))))
                 .andExpect(status().isNotFound());
     }
 
@@ -112,7 +112,7 @@ class StatusControllerIntegrationTest {
     void tutorEndpointRejectsStudentRole() throws Exception {
         mockMvc.perform(get("/api/tutor/example")
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
-                                .authorities(new SimpleGrantedAuthority("ROLE_student"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -120,7 +120,7 @@ class StatusControllerIntegrationTest {
     void studentEndpointAllowsStudentRole() throws Exception {
         mockMvc.perform(get("/api/student/example")
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
-                                .authorities(new SimpleGrantedAuthority("ROLE_student"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isNotFound());
     }
 
@@ -128,7 +128,7 @@ class StatusControllerIntegrationTest {
     void studentEndpointRejectsTutorRole() throws Exception {
         mockMvc.perform(get("/api/student/example")
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
-                                .authorities(new SimpleGrantedAuthority("ROLE_tutor"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_TUTOR"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -136,7 +136,7 @@ class StatusControllerIntegrationTest {
     void adminEndpointAllowsAdminRole() throws Exception {
         mockMvc.perform(get("/api/admin/example")
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
-                                .authorities(new SimpleGrantedAuthority("ROLE_admin"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isNotFound());
     }
 
@@ -144,7 +144,7 @@ class StatusControllerIntegrationTest {
     void adminEndpointRejectsTutorRole() throws Exception {
         mockMvc.perform(get("/api/admin/example")
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
-                                .authorities(new SimpleGrantedAuthority("ROLE_tutor"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_TUTOR"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -152,7 +152,7 @@ class StatusControllerIntegrationTest {
     void studentPingReturnsOkForStudentRole() throws Exception {
         mockMvc.perform(get("/api/student/ping")
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
-                                .authorities(new SimpleGrantedAuthority("ROLE_student"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"))
                 .andExpect(jsonPath("$.role").value("student"));
@@ -162,7 +162,7 @@ class StatusControllerIntegrationTest {
     void tutorPingReturnsOkForTutorRole() throws Exception {
         mockMvc.perform(get("/api/tutor/ping")
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
-                                .authorities(new SimpleGrantedAuthority("ROLE_tutor"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_TUTOR"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"))
                 .andExpect(jsonPath("$.role").value("tutor"));
@@ -172,7 +172,7 @@ class StatusControllerIntegrationTest {
     void adminPingReturnsOkForAdminRole() throws Exception {
         mockMvc.perform(get("/api/admin/ping")
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
-                                .authorities(new SimpleGrantedAuthority("ROLE_admin"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"))
                 .andExpect(jsonPath("$.role").value("admin"));
@@ -182,7 +182,7 @@ class StatusControllerIntegrationTest {
     void studentPingRejectsTutorRole() throws Exception {
         mockMvc.perform(get("/api/student/ping")
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
-                                .authorities(new SimpleGrantedAuthority("ROLE_tutor"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_TUTOR"))))
                 .andExpect(status().isForbidden());
     }
 
