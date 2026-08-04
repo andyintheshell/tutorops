@@ -10,7 +10,7 @@ on:
 permissions:
   actions: read
   contents: read
-  packages: write
+  packages: read
   pull-requests: read
 
 concurrency:
@@ -32,11 +32,29 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          required_workflows=(CI CodeQL Gitleaks SCA "Container Security")
+          source_workflow_path=".github/workflows/container-security.yml"
+          source_workflow="$(gh api \
+            --header 'Accept: application/vnd.github+json' \
+            "repos/${REPOSITORY}/actions/workflows/${SOURCE_WORKFLOW_ID}")"
+          if ! jq -e --arg expected_path "$source_workflow_path" \
+            '.path == $expected_path' <<< "$source_workflow" > /dev/null; then
+            echo "ERROR: workflow_run did not originate from $source_workflow_path"
+            exit 1
+          fi
+
+          required_workflow_names=(CI CodeQL Gitleaks SCA "Container Security")
+          required_workflow_paths=(
+            "ci.yml"
+            "codeql.yml"
+            "gitleaks.yml"
+            "sca.yml"
+            "container-security.yml"
+          )
           deadline=$((SECONDS + 1800))
 
           while (( SECONDS < deadline )); do
@@ -67,9 +85,9 @@ jobs:
             pull_head_sha="$(jq -r '.head.sha' <<< "$pull_request")"
             dependency_review_runs="$(gh api \
               --header 'Accept: application/vnd.github+json' \
-              "repos/${REPOSITORY}/actions/runs?head_sha=${pull_head_sha}&event=pull_request&per_page=100")"
+              "repos/${REPOSITORY}/actions/workflows/dependency-review.yml/runs?head_sha=${pull_head_sha}&event=pull_request&per_page=100")"
             if jq -e \
-              '[.workflow_runs[] | select(.name == "Dependency Review" and .head_sha == $head_sha and .conclusion == "success")] | length > 0' \
+              '[.workflow_runs[] | select(.head_sha == $head_sha and .conclusion == "success")] | length > 0' \
               --arg head_sha "$pull_head_sha" <<< "$dependency_review_runs" > /dev/null; then
               echo "PASS: Dependency Review"
             else
@@ -78,15 +96,16 @@ jobs:
               continue
             fi
 
-            runs="$(gh api \
-              --header 'Accept: application/vnd.github+json' \
-              "repos/${REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&event=push&per_page=100")"
-
             all_succeeded=true
-            for workflow_name in "${required_workflows[@]}"; do
-              if jq -e --arg workflow_name "$workflow_name" --arg head_sha "$HEAD_SHA" \
-                '[.workflow_runs[] | select(.name == $workflow_name and .head_sha == $head_sha and .event == "push" and .conclusion == "success")] | length > 0' \
-                <<< "$runs" > /dev/null; then
+            for i in "${!required_workflow_names[@]}"; do
+              workflow_name="${required_workflow_names[$i]}"
+              workflow_path="${required_workflow_paths[$i]}"
+              workflow_runs="$(gh api \
+                --header 'Accept: application/vnd.github+json' \
+                "repos/${REPOSITORY}/actions/workflows/${workflow_path}/runs?head_sha=${HEAD_SHA}&event=push&per_page=100")"
+              if jq -e --arg head_sha "$HEAD_SHA" \
+                '[.workflow_runs[] | select(.head_sha == $head_sha and .event == "push" and .conclusion == "success")] | length > 0' \
+                <<< "$workflow_runs" > /dev/null; then
                 echo "PASS: $workflow_name"
               else
                 all_succeeded=false
@@ -109,6 +128,9 @@ jobs:
     needs: verify-checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Check out merged commit
@@ -136,15 +158,26 @@ jobs:
             --pull \
             --file api/Dockerfile \
             --tag "$image:sha-$HEAD_SHA" \
-            --tag "$image:latest" \
             api
 
       - name: Push API container tags
         env:
           IMAGE: ghcr.io/${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           image="${IMAGE,,}/tutorops-api"
           docker push "$image:sha-$HEAD_SHA"
-          docker push "$image:latest"
+
+          current_main_sha="$(gh api \
+            --header 'Accept: application/vnd.github+json' \
+            "repos/${REPOSITORY}/commits/main" \
+            --jq '.sha')"
+          if [[ "$HEAD_SHA" == "$current_main_sha" ]]; then
+            docker tag "$image:sha-$HEAD_SHA" "$image:latest"
+            docker push "$image:latest"
+          else
+            echo "Skipping latest: $HEAD_SHA is no longer the current main SHA ($current_main_sha)."
+          fi

@@ -29,6 +29,10 @@ triage.
 | Container SBOM | Trivy | Pull request and main | Artifact generated |
 | Container publishing | Docker CLI / GHCR | Merged main only, after checks | Blocking gate |
 
+The container publishing gate resolves each required workflow by its file
+identity and validates the triggering workflow path, rather than trusting
+workflow display names.
+
 ## Current enforcement policy
 
 The pipeline blocks a change when:
@@ -40,8 +44,10 @@ The pipeline blocks a change when:
   known vulnerability;
 - CodeQL cannot successfully analyze the application.
 
-Trivy baseline findings are initially report-only. Findings are triaged
-before stronger blocking thresholds are introduced.
+Repository SCA findings from Trivy remain report-only and are triaged before
+stronger blocking thresholds are introduced. Container image scanning is a
+blocking policy for fixed HIGH and CRITICAL findings; unfixed image findings
+remain report-only under the current configuration.
 
 ## Finding lifecycle
 
