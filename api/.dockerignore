@@ -1,0 +1,22 @@
+# Build output and local caches
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+# Version control and editor metadata
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+*.iml
+
+# Local configuration and logs
+.env*
+*.log
+
+# Never send private key or certificate material to the Docker daemon
+**/*.key
+**/*.pem
+**/*.p12
+**/*.jks
+**/*.crt

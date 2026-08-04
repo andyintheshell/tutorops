@@ -1,0 +1,89 @@
+name: Container Security
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "api/**"
+      - ".github/workflows/container-security.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "api/**"
+      - ".github/workflows/container-security.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: container-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: Build and scan image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Build container image
+        run: |
+          docker build \
+            --pull \
+            --file api/Dockerfile \
+            --tag tutorops-api:${{ github.sha }} \
+            api
+
+      - name: Scan image and create SARIF report
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: tutorops-api:${{ github.sha }}
+          format: sarif
+          output: trivy-container.sarif
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "0"
+
+      - name: Upload scan results
+        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0
+        with:
+          sarif_file: trivy-container.sarif
+          category: tutorops-container
+
+      - name: Generate container CycloneDX SBOM
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: tutorops-api:${{ github.sha }}
+          format: cyclonedx
+          output: tutorops-container.cdx.json
+          scanners: vuln
+          skip-setup-trivy: true
+
+      - name: Upload container SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tutorops-container-sbom
+          path: tutorops-container.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce high-severity image policy
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: tutorops-api:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          skip-setup-trivy: true
