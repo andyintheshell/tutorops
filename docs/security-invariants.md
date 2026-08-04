@@ -98,6 +98,13 @@ Passwords, authorization codes, access tokens, refresh tokens, client secrets, a
 * analytics events;
 * audit records.
 
+### INV-IDENTITY-008: Cloud smoke mode is non-user-facing
+
+The `cloud-smoke` deployment profile is restricted to intentionally public and
+operational endpoints. It does not provide access to user or role-protected
+data and must not be used as the security configuration for a user-facing or
+production deployment.
+
 ## 4. Role and privilege invariants
 
 ### INV-ROLE-001: Roles cannot be self-assigned

@@ -25,6 +25,9 @@ triage.
 | Repository SCA | Trivy | Main and weekly | Report-only baseline |
 | Secret scanning | Gitleaks | Pull request, main, weekly | Blocking |
 | Application SBOM | CycloneDX Maven Plugin | Every package build | Artifact generated |
+| Container image scanning | Trivy | Pull request and main | Blocks fixed high and critical findings |
+| Container SBOM | Trivy | Pull request and main | Artifact generated |
+| Container publishing | Docker CLI / GHCR | Merged main only, after checks | Blocking gate |
 
 ## Current enforcement policy
 
@@ -66,8 +69,6 @@ Exceptions must:
 The following controls will be added when the corresponding artifact
 exists:
 
-- container image scanning;
-- container SBOM generation;
 - image signing and provenance attestations;
 - infrastructure-as-code scanning;
 - Kubernetes policy-as-code;
