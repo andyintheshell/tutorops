@@ -1,0 +1,2 @@
+# False positive: public GHCR image tag containing a 40-character commit SHA.
+infra/terraform/variables.tf:generic-api-key:16
