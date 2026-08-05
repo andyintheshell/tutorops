@@ -11,13 +11,13 @@ variable "aws_profile" {
 }
 
 variable "container_image" {
-  description = "Public GHCR image to run. Update this to the latest ARM64 SHA tag after publishing."
+  description = "Public GHCR ARM64 image to run, pinned by immutable manifest digest."
   type        = string
-  default     = "ghcr.io/andyintheshell/tutorops/tutorops-api:sha-7587dac9167de8b9545f467babe30b2d9e9b82cd"
+  default     = "ghcr.io/andyintheshell/tutorops/tutorops-api@sha256:63902928661ae5e1ee15bb9eb26ced69002650bf687ef728a991fcd9ce1144b7"
 
   validation {
-    condition     = can(regex("^ghcr\\.io/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+:sha-[0-9a-f]{40}$", var.container_image))
-    error_message = "container_image must be an immutable GHCR image tagged with a 40-character commit SHA."
+    condition     = can(regex("^ghcr\\.io/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@sha256:[0-9a-f]{64}$", var.container_image))
+    error_message = "container_image must be a GHCR image pinned to a 64-character SHA-256 manifest digest."
   }
 }
 
