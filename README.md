@@ -5,6 +5,7 @@
 [![Dependency Review](https://github.com/andyintheshell/tutorops/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/andyintheshell/tutorops/actions/workflows/dependency-review.yml)
 [![Gitleaks](https://github.com/andyintheshell/tutorops/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/andyintheshell/tutorops/actions/workflows/gitleaks.yml)
 [![SCA](https://github.com/andyintheshell/tutorops/actions/workflows/sca.yml/badge.svg)](https://github.com/andyintheshell/tutorops/actions/workflows/sca.yml)
+[![Terraform Security](https://github.com/andyintheshell/tutorops/actions/workflows/terraform.yml/badge.svg)](https://github.com/andyintheshell/tutorops/actions/workflows/terraform.yml)
 [![Container Security](https://github.com/andyintheshell/tutorops/actions/workflows/container-security.yml/badge.svg)](https://github.com/andyintheshell/tutorops/actions/workflows/container-security.yml)
 
 Security-focused tutoring operations platform for tutor profiles, availability, bookings, and administration. This project demonstrates full-stack delivery across Java, Spring Boot, React, OAuth 2.0/OIDC, Docker, Terraform, AWS, and automated AppSec/DevSecOps testing.
@@ -25,6 +26,7 @@ Security-focused tutoring operations platform for tutor profiles, availability, 
 - Security controls designed into the API, with the browser kept outside the authorization boundary.
 - Immutable container deployment using a verified ARM64 image pinned by manifest digest.
 - Infrastructure-as-code deployment to a real AWS EC2 environment, including a repeatable smoke-test profile.
+- Terraform formatting and configuration validation, plus Trivy IaC scanning with SARIF reporting in CI.
 - Automated build, dependency, secret, code, container, and supply-chain checks in CI.
 
 ## Architecture at a glance
@@ -151,6 +153,7 @@ TutorOps uses automated security controls throughout the development workflow:
 | Static analysis               | CodeQL SAST with extended security queries           |
 | Dependency governance         | Dependabot and pull-request dependency review        |
 | Software composition analysis | Trivy vulnerability scanning                         |
+| Infrastructure-as-code       | Terraform fmt/init/validate and Trivy config scanning |
 | Secret detection              | Gitleaks across pull requests and repository history |
 | Software bill of materials    | CycloneDX SBOM generated during Maven builds         |
 | Merge protection              | Required pull requests and security status checks    |

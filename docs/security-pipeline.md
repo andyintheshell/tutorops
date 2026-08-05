@@ -27,6 +27,7 @@ triage.
 | Application SBOM | CycloneDX Maven Plugin | Every package build | Artifact generated |
 | Container image scanning | Trivy | Pull request and main | Blocks fixed high and critical findings |
 | Container SBOM | Trivy | Pull request and main | Artifact generated |
+| Infrastructure-as-code scanning | Trivy config scanner | Pull request, main, weekly | Report-only baseline |
 | Container publishing | Docker CLI / GHCR | Merged main only, after checks | Blocking gate |
 
 The container publishing gate resolves each required workflow by its file
@@ -44,10 +45,11 @@ The pipeline blocks a change when:
   known vulnerability;
 - CodeQL cannot successfully analyze the application.
 
-Repository SCA findings from Trivy remain report-only and are triaged before
-stronger blocking thresholds are introduced. Container image scanning is a
-blocking policy for fixed HIGH and CRITICAL findings; unfixed image findings
-remain report-only under the current configuration.
+Repository SCA and infrastructure-as-code findings from Trivy remain
+report-only and are triaged before stronger blocking thresholds are
+introduced. Container image scanning is a blocking policy for fixed HIGH and
+CRITICAL findings; unfixed image findings remain report-only under the current
+configuration.
 
 ## Finding lifecycle
 
@@ -72,11 +74,7 @@ Exceptions must:
 
 ## Deferred controls
 
-The following controls will be added when the corresponding artifact
-exists:
-
 - image signing and provenance attestations;
-- infrastructure-as-code scanning;
 - Kubernetes policy-as-code;
 - dynamic application security testing;
 - cloud deployment gates.
