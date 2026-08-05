@@ -29,3 +29,11 @@ replay_pid*
 **/target/
 .env
 web/.env
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+crash.log
