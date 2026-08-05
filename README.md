@@ -7,7 +7,7 @@
 [![SCA](https://github.com/andyintheshell/tutorops/actions/workflows/sca.yml/badge.svg)](https://github.com/andyintheshell/tutorops/actions/workflows/sca.yml)
 [![Container Security](https://github.com/andyintheshell/tutorops/actions/workflows/container-security.yml/badge.svg)](https://github.com/andyintheshell/tutorops/actions/workflows/container-security.yml)
 
-Security-focused tutoring operations platform for tutor profiles, availability, bookings, and administration. This portfolio project demonstrates full-stack delivery across Java, Spring Boot, React, OAuth 2.0/OIDC, Docker, Terraform, AWS, and automated AppSec/DevSecOps testing.
+Security-focused tutoring operations platform for tutor profiles, availability, bookings, and administration. This project demonstrates full-stack delivery across Java, Spring Boot, React, OAuth 2.0/OIDC, Docker, Terraform, AWS, and automated AppSec/DevSecOps testing.
 
 ## Technology snapshot
 
