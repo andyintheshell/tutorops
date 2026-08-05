@@ -25,9 +25,10 @@ jobs:
     name: Build and scan image
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      required: ${{ steps.scope.outputs.required }}
     permissions:
       contents: read
-      packages: write
       security-events: write
 
     steps:
@@ -118,8 +119,59 @@ jobs:
           exit-code: "1"
           skip-setup-trivy: true
 
-      - name: Log in to GitHub Container Registry
+      - name: Export verified image
         if: ${{ steps.scope.outputs.required == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          IMAGE_TAG: tutorops-api:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker image inspect "$IMAGE_TAG" --format '{{.Id}}' > image-id.txt
+          docker save "$IMAGE_TAG" | gzip -n > tutorops-api-image.tar.gz
+          sha256sum tutorops-api-image.tar.gz > tutorops-api-image.tar.gz.sha256
+
+      - name: Upload verified image
+        if: ${{ steps.scope.outputs.required == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tutorops-container-image
+          path: |
+            image-id.txt
+            tutorops-api-image.tar.gz
+            tutorops-api-image.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish verified image to GHCR
+    needs: image
+    if: ${{ needs.image.result == 'success' && needs.image.outputs.required == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: none
+      packages: write
+
+    steps:
+      - name: Download verified image
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: tutorops-container-image
+
+      - name: Verify and load image
+        env:
+          IMAGE_TAG: tutorops-api:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          sha256sum --check tutorops-api-image.tar.gz.sha256
+          docker load --input <(gzip -dc tutorops-api-image.tar.gz)
+          actual_image_id="$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')"
+          expected_image_id="$(< image-id.txt)"
+          if [[ "$actual_image_id" != "$expected_image_id" ]]; then
+            echo "ERROR: downloaded image identity does not match the scanned image"
+            exit 1
+          fi
+
+      - name: Log in to GitHub Container Registry
         env:
           GH_TOKEN: ${{ github.token }}
           OWNER: ${{ github.repository_owner }}
@@ -127,8 +179,7 @@ jobs:
           set -euo pipefail
           printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$OWNER" --password-stdin
 
-      - name: Publish scanned image by source SHA
-        if: ${{ steps.scope.outputs.required == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Publish verified image by source SHA
         env:
           IMAGE: ghcr.io/${{ github.repository }}
           HEAD_SHA: ${{ github.sha }}
