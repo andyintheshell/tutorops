@@ -93,6 +93,18 @@ TUTOROPS_OIDC_API_CLIENT_ID=tutorops-api
 TUTOROPS_CORS_ALLOWED_ORIGIN=http://localhost:5173
 ```
 
+## Cloud smoke profile
+
+The `cloud-smoke` Spring profile is intended only for a minimal deployment
+smoke check when the API cannot reach Keycloak. It does not configure an OAuth2
+resource server and therefore does not validate or accept bearer tokens.
+
+With this profile, `/api/public/**`, `/actuator/health`, and `/actuator/info`
+are permitted, as are `OPTIONS /**` requests for CORS preflight. All other
+requests are denied, including `/api/me` and role-protected endpoints.
+Preflight permission does not expose application data. This profile must not
+be used for a user-facing or production deployment.
+
 ## Roles and authorization
 
 Keycloak client roles are represented in the token under:

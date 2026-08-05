@@ -4,9 +4,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - "api/**"
-      - ".github/workflows/container-security.yml"
   push:
     branches:
       - main
@@ -28,12 +25,42 @@ jobs:
     name: Build and scan image
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      required: ${{ steps.scope.outputs.required }}
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Check out repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Determine whether Container Security is required
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE '^(api/|\.github/workflows/container-security\.yml$)'; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Not required for these changes
+        if: steps.scope.outputs.required == 'false'
+        run: echo "Container Security is not required because this pull request does not change the API or Container Security workflow."
 
       - name: Build container image
+        if: steps.scope.outputs.required == 'true'
         run: |
           docker build \
             --pull \
@@ -42,6 +69,7 @@ jobs:
             api
 
       - name: Scan image and create SARIF report
+        if: steps.scope.outputs.required == 'true'
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: image
@@ -53,13 +81,14 @@ jobs:
           exit-code: "0"
 
       - name: Upload scan results
-        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        if: ${{ always() && steps.scope.outputs.required == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: github/codeql-action/upload-sarif@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0
         with:
           sarif_file: trivy-container.sarif
           category: tutorops-container
 
       - name: Generate container CycloneDX SBOM
+        if: steps.scope.outputs.required == 'true'
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: image
@@ -70,6 +99,7 @@ jobs:
           skip-setup-trivy: true
 
       - name: Upload container SBOM
+        if: steps.scope.outputs.required == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tutorops-container-sbom
@@ -78,6 +108,7 @@ jobs:
           retention-days: 14
 
       - name: Enforce high-severity image policy
+        if: steps.scope.outputs.required == 'true'
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: image
@@ -87,3 +118,73 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
           skip-setup-trivy: true
+
+      - name: Export verified image
+        if: ${{ steps.scope.outputs.required == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          IMAGE_TAG: tutorops-api:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker image inspect "$IMAGE_TAG" --format '{{.Id}}' > image-id.txt
+          docker save "$IMAGE_TAG" | gzip -n > tutorops-api-image.tar.gz
+          sha256sum tutorops-api-image.tar.gz > tutorops-api-image.tar.gz.sha256
+
+      - name: Upload verified image
+        if: ${{ steps.scope.outputs.required == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tutorops-container-image
+          path: |
+            image-id.txt
+            tutorops-api-image.tar.gz
+            tutorops-api-image.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish verified image to GHCR
+    needs: image
+    if: ${{ needs.image.result == 'success' && needs.image.outputs.required == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: none
+      packages: write
+
+    steps:
+      - name: Download verified image
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: tutorops-container-image
+
+      - name: Verify and load image
+        env:
+          IMAGE_TAG: tutorops-api:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          sha256sum --check tutorops-api-image.tar.gz.sha256
+          docker load --input <(gzip -dc tutorops-api-image.tar.gz)
+          actual_image_id="$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')"
+          expected_image_id="$(< image-id.txt)"
+          if [[ "$actual_image_id" != "$expected_image_id" ]]; then
+            echo "ERROR: downloaded image identity does not match the scanned image"
+            exit 1
+          fi
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$OWNER" --password-stdin
+
+      - name: Publish verified image by source SHA
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          image="${IMAGE,,}/tutorops-api"
+          docker tag "tutorops-api:${HEAD_SHA}" "$image:sha-$HEAD_SHA"
+          docker push "$image:sha-$HEAD_SHA"
