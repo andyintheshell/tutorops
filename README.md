@@ -14,7 +14,8 @@ Security-focused tutoring operations platform for tutor profiles, availability, 
 
 | Area | Technologies and practices |
 | --- | --- |
-| Backend | Java 21, Spring Boot, Maven, layered REST API architecture |
+| Backend | Java 21, Spring Boot, Maven, layered REST API architecture, Spring Data JPA |
+| Data | PostgreSQL, Flyway versioned migrations, Testcontainers integration tests |
 | Frontend | React, TypeScript, Vite, Keycloak browser client |
 | Identity and security | Keycloak, OAuth 2.0/OIDC, PKCE, JWT resource-server validation, role and ownership authorization |
 | Containers and cloud | Docker, GHCR, AWS EC2 Graviton ARM64, Terraform, default VPC networking |
@@ -35,17 +36,18 @@ The React frontend uses Keycloak’s public-client authorization-code flow with 
 
 ## Local development
 
-The local stack consists of a Keycloak container, a containerized Spring Boot API image, and a Vite-powered React frontend:
+The local stack consists of Keycloak and PostgreSQL containers, a Spring Boot API, and a Vite-powered React frontend:
 
 | Component | Local address | Start/build command |
 | --- | --- | --- |
 | Keycloak | `http://localhost:8081` | `docker compose up -d keycloak` |
+| PostgreSQL | `localhost:5432` | `docker compose up -d postgres` |
 | API | `http://localhost:8080` | `cd api && ./mvnw spring-boot:run` |
 | Frontend | `http://localhost:5173` | `cd web && npm run dev` |
 
 ### Prerequisites
 
-- Docker with Compose
+- Docker with Compose (required for Keycloak, PostgreSQL, and integration tests)
 - Node.js and npm
 - Java 21, only when running the API or its tests outside a container
 
@@ -60,13 +62,15 @@ cp web/.env.example web/.env
 
 The Keycloak realm and clients are imported from [`infra/keycloak/import/tutorops-realm.json`](infra/keycloak/import/tutorops-realm.json) on first startup.
 
-### Start Keycloak
+### Start local infrastructure
 
 ```bash
-docker compose up -d keycloak
+docker compose up -d keycloak postgres
 ```
 
 Keycloak is exposed on port `8081`; its container listens on port `8080`. The Compose project persists its data in the `keycloak-data` volume.
+
+PostgreSQL is exposed only on the loopback interface at port `5432` and persists its data in the `postgres_data` volume. The API connects using `TUTOROPS_DB_URL`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` from the root `.env` file.
 
 ### Run the API
 
@@ -83,7 +87,9 @@ The API Dockerfile performs a full Maven verification during the image build and
 docker build --tag tutorops-api:local api
 ```
 
-The current `compose.yaml` starts Keycloak only; use the Maven command above to run the API against the local OIDC configuration.
+The API uses Spring Data JPA for persistence and Flyway for schema management. Hibernate is configured with `ddl-auto: validate`, so application startup validates the schema but never creates or changes it. Flyway applies migrations from `api/src/main/resources/db/migration` before validation; the initial migration creates the `app_user` table.
+
+The current Compose file provides local infrastructure only; run the API with Maven as shown above.
 
 Run the API verification lifecycle:
 
@@ -91,6 +97,8 @@ Run the API verification lifecycle:
 cd api
 ./mvnw verify
 ```
+
+The API integration tests start an isolated PostgreSQL 18.4 container through Testcontainers. Docker must be running when these tests execute.
 
 ### Run the frontend
 

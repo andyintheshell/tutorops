@@ -1,6 +1,22 @@
 spring:
   application:
     name: tutorops-api
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  datasource:
+    url: ${TUTOROPS_DB_URL}
+    username: ${POSTGRES_USER:tutorops}
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
   security:
     oauth2:
       resourceserver:

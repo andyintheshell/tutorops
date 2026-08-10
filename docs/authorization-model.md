@@ -257,7 +257,7 @@ These endpoints expose only intentionally public fields.
 
 ```text
 GET /api/me
-PATCH /api/me
+PUT /api/me
 ```
 
 These endpoints operate on the authenticated user.
@@ -514,6 +514,10 @@ The audit system must not record:
 * database credentials.
 
 Authorization denials should be logged selectively. Logging every routine denial may create noise or store unnecessary information, while repeated or sensitive denials may be security-relevant.
+
+## Current persistence boundary
+
+The current implementation stores an application-user projection in PostgreSQL. It identifies records by the validated issuer and subject pair from the server-side security context; those values are never accepted from request parameters or request bodies. `GET /api/me` reads an existing record, while `PUT /api/me` provisions or updates it from validated token claims. Flyway owns schema changes, and JPA schema generation is disabled in favor of startup validation.
 
 ## 14. Open authorization questions
 

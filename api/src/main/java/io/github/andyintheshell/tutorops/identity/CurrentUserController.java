@@ -4,7 +4,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -14,10 +16,30 @@ import java.util.List;
 @RequestMapping("/api")
 public class CurrentUserController {
 
+    private final CurrentUserService currentUserService;
+
+    public CurrentUserController(CurrentUserService currentUserService) {
+        this.currentUserService = currentUserService;
+    }
+
     @GetMapping("/me")
-    public CurrentUserResponse currentUser(
+    public ResponseEntity<CurrentUserResponse> currentUser(
             @AuthenticationPrincipal Jwt jwt,
             Authentication authentication) {
+        return currentUserService.findExisting(jwt)
+                .map(ignored -> ResponseEntity.ok(currentUserResponse(jwt, authentication)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/me")
+    public CurrentUserResponse provisionCurrentUser(
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
+        currentUserService.findOrProvision(jwt);
+        return currentUserResponse(jwt, authentication);
+    }
+
+    private CurrentUserResponse currentUserResponse(Jwt jwt, Authentication authentication) {
         List<String> roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .filter(authority -> authority.startsWith("ROLE_"))
