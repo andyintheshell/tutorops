@@ -58,6 +58,12 @@ It initializes Keycloak with:
 http://localhost:5173/silent-check-sso.html
 ```
 
+The web server normally sends `X-Frame-Options: DENY`. The silent callback is
+the sole scoped exception because Keycloak must load it in a same-origin hidden
+iframe during `check-sso`; that exact callback location sends
+`X-Frame-Options: SAMEORIGIN` instead. No other frontend document is permitted
+to be framed.
+
 The `tutorops-web` client is configured as a public client with Standard Flow enabled, redirect URI `http://localhost:5173/*`, and web origin `http://localhost:5173`.
 
 PKCE protects the authorization-code flow in a browser. The frontend creates a code verifier, sends only its derived S256 challenge to Keycloak, and later proves possession of the verifier when exchanging the authorization code. No client secret is stored in the frontend.
