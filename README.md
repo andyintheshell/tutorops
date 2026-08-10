@@ -38,12 +38,18 @@ The React frontend uses Keycloak’s public-client authorization-code flow with 
 
 The local stack consists of Keycloak and PostgreSQL containers, a Spring Boot API, and a Vite-powered React frontend:
 
+To build and start the complete stack:
+
+```bash
+docker compose up -d --build
+```
+
 | Component | Local address | Start/build command |
 | --- | --- | --- |
 | Keycloak | `http://localhost:8081` | `docker compose up -d keycloak` |
 | PostgreSQL | `localhost:5432` | `docker compose up -d postgres` |
-| API | `http://localhost:8080` | `cd api && ./mvnw spring-boot:run` |
-| Frontend | `http://localhost:5173` | `cd web && npm run dev` |
+| API | `http://localhost:8080` | `docker compose up -d --build api` or `cd api && ./mvnw spring-boot:run` |
+| Frontend | `http://localhost:5173` | `docker compose up -d --build web` or `cd web && npm run dev` |
 
 ### Prerequisites
 
@@ -62,17 +68,17 @@ cp web/.env.example web/.env
 
 The Keycloak realm and clients are imported from [`infra/keycloak/import/tutorops-realm.json`](infra/keycloak/import/tutorops-realm.json) on first startup.
 
-### Start local infrastructure
+### Start the local stack
 
 ```bash
-docker compose up -d keycloak postgres
+docker compose up -d --build
 ```
 
-Keycloak is exposed on port `8081`; its container listens on port `8080`. The Compose project persists its data in the `keycloak-data` volume.
+This builds and starts Keycloak, PostgreSQL, the API, and the production frontend container. Keycloak is exposed on port `8081`; its container listens on port `8080`. The Compose project persists its data in the `keycloak-data` volume.
 
 PostgreSQL is exposed only on the loopback interface at port `5432` and persists its data in the `postgres_data` volume. The API connects using `TUTOROPS_DB_URL`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` from the root `.env` file.
 
-### Run the API
+### Run the API separately
 
 For the fastest local development feedback, run the API with the Maven wrapper:
 
@@ -89,7 +95,7 @@ docker build --tag tutorops-api:local api
 
 The API uses Spring Data JPA for persistence and Flyway for schema management. Hibernate is configured with `ddl-auto: validate`, so application startup validates the schema but never creates or changes it. Flyway applies migrations from `api/src/main/resources/db/migration` before validation; the initial migration creates the `app_user` table.
 
-The current Compose file provides local infrastructure only; run the API with Maven as shown above.
+For normal local use, start the complete stack with `docker compose up -d --build` as described above. The API container connects to PostgreSQL and Keycloak over the Compose network. Its issuer remains the browser-visible `http://localhost:8081` URL for token validation, while the JWK endpoint uses the internal `keycloak` service name.
 
 Run the API verification lifecycle:
 
@@ -102,7 +108,7 @@ The API integration tests start an isolated PostgreSQL 18.4 container through Te
 
 ### Run the frontend
 
-Install dependencies and start the Vite development server:
+For normal local use, start the complete stack with `docker compose up -d --build` and open [`http://localhost:5173`](http://localhost:5173). To run the Vite development server separately:
 
 ```bash
 cd web
@@ -111,6 +117,8 @@ npm run dev
 ```
 
 Open [`http://localhost:5173`](http://localhost:5173) and sign in through Keycloak. The frontend uses the `tutorops-web` public client and the API uses the `tutorops-api` audience. To create a production frontend bundle, run `npm run build` from `web/`.
+
+The frontend image serves the compiled bundle with an unprivileged Nginx process. Its Vite settings are build-time values; override `VITE_KEYCLOAK_URL` or `VITE_API_URL` in the root `.env` when the browser must reach those services at different addresses.
 
 Public API endpoints:
 

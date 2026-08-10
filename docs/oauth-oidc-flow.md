@@ -38,7 +38,7 @@ VITE_KEYCLOAK_URL=http://localhost:8081
 VITE_KEYCLOAK_REALM=tutorops
 VITE_KEYCLOAK_CLIENT_ID=tutorops-web
 VITE_API_CLIENT_ID=tutorops-api
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_URL=http://localhost:8080
 ```
 
 It initializes Keycloak with:
@@ -91,6 +91,7 @@ The issuer, audience, API client ID, and CORS origin can be overridden with envi
 TUTOROPS_OIDC_ISSUER=http://localhost:8081/realms/tutorops
 TUTOROPS_OIDC_AUDIENCE=tutorops-api
 TUTOROPS_OIDC_API_CLIENT_ID=tutorops-api
+TUTOROPS_OIDC_JWK_SET_URI=http://keycloak:8080/realms/tutorops/protocol/openid-connect/certs
 TUTOROPS_CORS_ALLOWED_ORIGIN=http://localhost:5173
 ```
 
@@ -206,24 +207,25 @@ remains enabled for non-API endpoints.
 ## Local startup
 
 1. Create local environment values from the examples. Do not commit real credentials.
-2. Start Keycloak from the repository root:
+2. Start the complete stack from the repository root:
 
    ```bash
-   docker compose up -d keycloak postgres
+   docker compose up -d --build
    ```
 
-3. Start the API from `api/` (Flyway runs during startup):
+   This starts Keycloak, PostgreSQL, the API, and the production frontend container. Flyway runs during API startup.
+
+3. For frontend or API development outside containers, stop the corresponding Compose service and run it from its project directory:
 
    ```bash
+   # API
+   cd api
    ./mvnw spring-boot:run
-   ```
-
-4. Start the frontend from `web/`:
-
-   ```bash
+   # Or frontend
+   cd web
    npm run dev
    ```
 
-5. Open `http://localhost:5173` and sign in.
+4. Open `http://localhost:5173` and sign in.
 
 If the realm or client configuration changes, remember that the persistent `keycloak-data` volume can preserve the previous imported configuration.
