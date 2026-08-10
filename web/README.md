@@ -1,4 +1,25 @@
-# React + TypeScript + Vite
+# TutorOps web
+
+The frontend is normally served as part of the full local Compose stack:
+
+```bash
+docker compose up -d --build
+```
+
+Open <http://localhost:5173>. The container serves the production Vite bundle
+with an unprivileged Nginx process.
+
+For frontend development with Vite hot reload:
+
+```bash
+npm ci
+npm run dev
+```
+
+The Vite settings are read from `web/.env`. See the repository README and
+`docs/oauth-oidc-flow.md` for the complete local setup and authentication flow.
+
+## Vite project details
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

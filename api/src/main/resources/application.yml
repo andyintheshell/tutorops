@@ -22,6 +22,7 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${TUTOROPS_OIDC_ISSUER:http://localhost:8081/realms/tutorops}
+          jwk-set-uri: ${TUTOROPS_OIDC_JWK_SET_URI:http://localhost:8081/realms/tutorops/protocol/openid-connect/certs}
           audiences:
             - ${TUTOROPS_OIDC_AUDIENCE:tutorops-api}
 
