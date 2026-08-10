@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?Required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Required}
       TUTOROPS_OIDC_ISSUER: ${TUTOROPS_OIDC_ISSUER:-http://localhost:8081/realms/tutorops}
-      TUTOROPS_OIDC_JWK_SET_URI: ${TUTOROPS_OIDC_JWK_SET_URI:-http://keycloak:8080/realms/tutorops/protocol/openid-connect/certs}
+      TUTOROPS_OIDC_JWK_SET_URI: ${TUTOROPS_OIDC_JWK_SET_URI_COMPOSE:-http://keycloak:8080/realms/tutorops/protocol/openid-connect/certs}
       TUTOROPS_CORS_ALLOWED_ORIGIN: ${TUTOROPS_CORS_ALLOWED_ORIGIN:-http://localhost:5173}
     depends_on:
       postgres:

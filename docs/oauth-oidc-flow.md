@@ -97,9 +97,15 @@ The issuer, audience, API client ID, and CORS origin can be overridden with envi
 TUTOROPS_OIDC_ISSUER=http://localhost:8081/realms/tutorops
 TUTOROPS_OIDC_AUDIENCE=tutorops-api
 TUTOROPS_OIDC_API_CLIENT_ID=tutorops-api
-TUTOROPS_OIDC_JWK_SET_URI=http://keycloak:8080/realms/tutorops/protocol/openid-connect/certs
+TUTOROPS_OIDC_JWK_SET_URI=http://localhost:8081/realms/tutorops/protocol/openid-connect/certs
+TUTOROPS_OIDC_JWK_SET_URI_COMPOSE=http://keycloak:8080/realms/tutorops/protocol/openid-connect/certs
 TUTOROPS_CORS_ALLOWED_ORIGIN=http://localhost:5173
 ```
+
+Host-run API processes use `TUTOROPS_OIDC_JWK_SET_URI`, which points to the
+browser-visible Keycloak port. The Compose API container uses
+`TUTOROPS_OIDC_JWK_SET_URI_COMPOSE` instead, so it reaches Keycloak through the
+internal `keycloak:8080` service address.
 
 ## Cloud smoke profile
 
