@@ -106,6 +106,14 @@ preflight permission does not expose application data or grant access to user
 or role-protected endpoints. The profile must not be used as the security
 configuration for a user-facing or production deployment.
 
+### INV-UI-001: Same-origin framing protection
+
+The web frontend sends `X-Frame-Options: DENY` for normal documents. The
+`/silent-check-sso.html` callback is the only scoped exception: it sends
+`X-Frame-Options: SAMEORIGIN` because Keycloak's silent SSO check loads that
+non-sensitive callback in a same-origin hidden iframe. No other frontend
+document may be framed.
+
 ## 4. Role and privilege invariants
 
 ### INV-ROLE-001: Roles cannot be self-assigned

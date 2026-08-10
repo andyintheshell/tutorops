@@ -9,12 +9,15 @@ COPY mvnw pom.xml ./
 RUN chmod +x mvnw
 
 COPY src/ src/
+COPY healthcheck/ healthcheck/
 
 # Package the application without integration tests. Testcontainers-based
 # verification runs in CI before this image build and cannot access a Docker
 # daemon from inside an isolated BuildKit stage.
 RUN ./mvnw --batch-mode --no-transfer-progress package -DskipTests \
-    && cp target/tutorops-api-*.jar /build/app.jar
+    && cp target/tutorops-api-*.jar /build/app.jar \
+    && javac --release 21 -d /build/healthcheck healthcheck/Healthcheck.java \
+    && jar --create --file /build/healthcheck.jar --main-class Healthcheck -C /build/healthcheck Healthcheck.class
 
 # Distroless provides a small JRE-only runtime with no shell or package manager.
 # The nonroot variant runs as an unprivileged user by default.
@@ -26,6 +29,7 @@ WORKDIR /app
 USER 65532:65532
 
 COPY --from=build /build/app.jar /app/app.jar
+COPY --from=build /build/healthcheck.jar /app/healthcheck.jar
 
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
