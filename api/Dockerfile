@@ -10,8 +10,10 @@ RUN chmod +x mvnw
 
 COPY src/ src/
 
-# Run the complete Maven verification lifecycle in the image build.
-RUN ./mvnw --batch-mode --no-transfer-progress verify \
+# Package the application without integration tests. Testcontainers-based
+# verification runs in CI before this image build and cannot access a Docker
+# daemon from inside an isolated BuildKit stage.
+RUN ./mvnw --batch-mode --no-transfer-progress package -DskipTests \
     && cp target/tutorops-api-*.jar /build/app.jar
 
 # Distroless provides a small JRE-only runtime with no shell or package manager.

@@ -1,20 +1,35 @@
 package io.github.andyintheshell.tutorops.status;
 
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+
+import javax.crypto.spec.SecretKeySpec;
 
 import org.junit.jupiter.api.Test;
+import io.github.andyintheshell.tutorops.identity.AppUserRepository;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -22,10 +37,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import({io.github.andyintheshell.tutorops.TestDatabaseConfiguration.class,
+        StatusControllerIntegrationTest.JwtDecoderTestConfiguration.class})
 class StatusControllerIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private AppUserRepository appUserRepository;
 
     @Test
     void statusEndpointReturnsStatusAndService() throws Exception {
@@ -71,10 +91,21 @@ class StatusControllerIntegrationTest {
     }
 
     @Test
-    void meEndpointAcceptsAnyAuthenticatedUser() throws Exception {
+    void meEndpointRejectsUnsignedJwt() throws Exception {
+        mockMvc.perform(get("/api/me")
+                        .header("Authorization", "Bearer " + unsignedJwt()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void meEndpointReturnsExistingAppUser() throws Exception {
+        Jwt jwt = currentUserJwt();
+        appUserRepository.saveAndFlush(new io.github.andyintheshell.tutorops.identity.AppUser(
+                jwt.getIssuer().toString(), jwt.getSubject(), "stored@example.test", "Stored User"));
+
         mockMvc.perform(get("/api/me")
                         .with(SecurityMockMvcRequestPostProcessors.authentication(
-                                new JwtAuthenticationToken(currentUserJwt(),
+                                new JwtAuthenticationToken(jwt,
                                         List.of(new SimpleGrantedAuthority("ROLE_TUTOR"))))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("user-123"))
@@ -86,11 +117,87 @@ class StatusControllerIntegrationTest {
                 .andExpect(jsonPath("$.roles[0]").value("TUTOR"));
     }
 
+    @Test
+    void getMeReturnsNotFoundForMissingAppUser() throws Exception {
+        Jwt jwt = currentUserJwt("read-only-user");
+        long usersBefore = appUserRepository.count();
+
+        mockMvc.perform(get("/api/me")
+                .with(SecurityMockMvcRequestPostProcessors.authentication(
+                                new JwtAuthenticationToken(jwt, List.of()))))
+                .andExpect(status().isNotFound());
+
+        org.assertj.core.api.Assertions.assertThat(appUserRepository.count()).isEqualTo(usersBefore);
+    }
+
+    @Test
+    void putMeEndpointRequiresAuthentication() throws Exception {
+        mockMvc.perform(put("/api/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void putMeProvisionsAnAppUser() throws Exception {
+        Jwt jwt = currentUserJwt("put-user");
+
+        mockMvc.perform(put("/api/me")
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(
+                                new JwtAuthenticationToken(jwt, List.of()))))
+                .andExpect(status().isOk());
+
+        org.assertj.core.api.Assertions.assertThat(
+                        appUserRepository.findByIssuerAndSubject(
+                                jwt.getIssuer().toString(), jwt.getSubject()))
+                .isPresent();
+    }
+
+    @Test
+    void concurrentPutMeRequestsProvisionOnlyOneAppUser() throws Exception {
+        Jwt jwt = currentUserJwt("concurrent-put-user");
+        int requestCount = 8;
+        CountDownLatch ready = new CountDownLatch(requestCount);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(requestCount)) {
+            List<Future<Integer>> responses = java.util.stream.IntStream.range(0, requestCount)
+                    .mapToObj(ignored -> executor.submit(() -> {
+                        ready.countDown();
+                        start.await();
+                        return mockMvc.perform(put("/api/me")
+                                        .with(SecurityMockMvcRequestPostProcessors.authentication(
+                                                new JwtAuthenticationToken(jwt, List.of()))))
+                                .andReturn()
+                                .getResponse()
+                                .getStatus();
+                    }))
+                    .toList();
+
+            ready.await();
+            start.countDown();
+
+            for (Future<Integer> response : responses) {
+                org.assertj.core.api.Assertions.assertThat(response.get()).isEqualTo(200);
+            }
+        }
+
+        org.assertj.core.api.Assertions.assertThat(appUserRepository
+                        .findAll().stream()
+                        .filter(user -> user.getIssuer().equals(jwt.getIssuer().toString()))
+                        .filter(user -> user.getSubject().equals(jwt.getSubject()))
+                        .count())
+                .isEqualTo(1);
+    }
+
     private Jwt currentUserJwt() {
+        return currentUserJwt("user-123");
+    }
+
+    private Jwt currentUserJwt(String subject) {
         Instant now = Instant.now();
         return Jwt.withTokenValue("test-token")
                 .header("alg", "none")
-                .subject("user-123")
+                .issuer("https://issuer.example.test/realms/tutorops")
+                .subject(subject)
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(300))
                 .claim("preferred_username", "alex")
@@ -98,6 +205,34 @@ class StatusControllerIntegrationTest {
                 .claim("given_name", "Alex")
                 .claim("family_name", "Example")
                 .build();
+    }
+
+    private String unsignedJwt() {
+        String header = """
+                {"alg":"none","typ":"JWT"}
+                """;
+        String payload = """
+                {"iss":"https://issuer.example.test/realms/tutorops","sub":"attacker"}
+                """;
+
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(header.getBytes(StandardCharsets.UTF_8))
+                + "."
+                + Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes(StandardCharsets.UTF_8))
+                + ".";
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class JwtDecoderTestConfiguration {
+
+        @Bean
+        JwtDecoder jwtDecoder() {
+            SecretKeySpec key = new SecretKeySpec(
+                    "test-only-signing-key-that-is-long-enough".getBytes(StandardCharsets.UTF_8),
+                    "HmacSHA256");
+            return NimbusJwtDecoder.withSecretKey(key)
+                    .macAlgorithm(MacAlgorithm.HS256)
+                    .build();
+        }
     }
 
     @Test

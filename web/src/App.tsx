@@ -19,6 +19,12 @@ type EndpointResult = {
   status: number | 'error' | null
 }
 
+type MeResult = {
+  method: 'GET' | 'PUT'
+  status: number | 'error'
+  body: unknown
+}
+
 type DecodedToken = {
   header: unknown
   payload: unknown
@@ -73,6 +79,8 @@ function App({ keycloak, initialAuthenticated }: AppProps) {
   const [checkingEndpoints, setCheckingEndpoints] = useState(false)
   const [tokenDetails, setTokenDetails] = useState<TokenDetails | null>(null)
   const [showTokenDialog, setShowTokenDialog] = useState(false)
+  const [meResult, setMeResult] = useState<MeResult | null>(null)
+  const [meRequest, setMeRequest] = useState<'GET' | 'PUT' | null>(null)
 
   useEffect(() => {
     keycloak.onAuthSuccess = () => setAuthenticated(true)
@@ -114,6 +122,28 @@ function App({ keycloak, initialAuthenticated }: AppProps) {
       idToken: decodeToken(keycloak.idToken),
     })
     setShowTokenDialog(true)
+  }
+
+  const callMeEndpoint = async (method: 'GET' | 'PUT') => {
+    setMeRequest(method)
+    try {
+      await keycloak.updateToken(30)
+      const apiBaseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '')
+      const response = await fetch(`${apiBaseUrl}/api/me`, {
+        method,
+        headers: { Authorization: `Bearer ${keycloak.token}` },
+      })
+      const body = await response.json().catch(() => null)
+      setMeResult({ method, status: response.status, body })
+    } catch {
+      setMeResult({
+        method,
+        status: 'error',
+        body: { error: 'The authenticated request could not be completed.' },
+      })
+    } finally {
+      setMeRequest(null)
+    }
   }
 
   const checkRoleEndpoints = useCallback(async () => {
@@ -161,6 +191,46 @@ function App({ keycloak, initialAuthenticated }: AppProps) {
             <button type="button" className="check-button token-button" onClick={() => void inspectTokens()}>
               Inspect tokens
             </button>
+            <section className="me-checks" aria-labelledby="me-checks-title">
+              <div className="section-heading">
+                <div>
+                  <p className="section-kicker">Authenticated API</p>
+                  <h2 id="me-checks-title">Current user</h2>
+                </div>
+                <div className="me-actions">
+                  <button
+                    type="button"
+                    className="check-button"
+                    onClick={() => void callMeEndpoint('GET')}
+                    disabled={meRequest !== null}
+                  >
+                    {meRequest === 'GET' ? 'Loading…' : 'GET /api/me'}
+                  </button>
+                  <button
+                    type="button"
+                    className="check-button"
+                    onClick={() => void callMeEndpoint('PUT')}
+                    disabled={meRequest !== null}
+                  >
+                    {meRequest === 'PUT' ? 'Saving…' : 'PUT /api/me'}
+                  </button>
+                </div>
+              </div>
+              <p className="section-description">
+                Both requests use your current Keycloak access token. The response JSON appears below.
+              </p>
+              {meResult && (
+                <div className="me-result">
+                  <div className="me-result-heading">
+                    <strong>{meResult.method} /api/me</strong>
+                    <span className={`endpoint-status status-${meResult.status === 'error' ? 'error' : meResult.status}`}>
+                      {meResult.status === 'error' ? 'ERROR' : meResult.status}
+                    </span>
+                  </div>
+                  <pre aria-label={`${meResult.method} /api/me response`}>{JSON.stringify(meResult.body, null, 2)}</pre>
+                </div>
+              )}
+            </section>
             <section className="endpoint-checks" aria-labelledby="endpoint-checks-title">
               <div className="section-heading">
                 <div>

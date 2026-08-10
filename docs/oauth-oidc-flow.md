@@ -8,7 +8,8 @@ TutorOps uses Keycloak as its OpenID Connect (OIDC) identity provider. The React
 | --- | --- | --- | --- |
 | Keycloak | `http://localhost:8081` | `tutorops` realm | Authenticates users and issues tokens |
 | React frontend | `http://localhost:5173` | `tutorops-web` | Starts the browser login flow |
-| Spring API | `http://localhost:8080` | `tutorops-api` | Validates access tokens and enforces authorization |
+| Spring API | `http://localhost:8080` | `tutorops-api` | Validates access tokens, persists application users, and enforces authorization |
+| PostgreSQL | `localhost:5432` | — | Stores application data; local access is loopback-only |
 
 The realm is imported from `infra/keycloak/import/tutorops-realm.json` when the Keycloak container starts for the first time.
 
@@ -159,7 +160,9 @@ Successful responses are role-specific, for example:
 
 ## Current-user endpoint
 
-`GET /api/me` returns a safe DTO derived from the authenticated token:
+The API keeps an application-user record keyed by the validated `(issuer, subject)` pair. This prevents the same subject value from colliding across trusted issuers. Spring Data JPA accesses the repository through the service layer, and Flyway owns schema changes. Hibernate runs in validation mode (`ddl-auto: validate`) and does not mutate the schema.
+
+`GET /api/me` returns a safe DTO only when the authenticated identity already has an application user record:
 
 ```json
 {
@@ -174,6 +177,17 @@ Successful responses are role-specific, for example:
 
 The raw JWT and persistence entities are not returned.
 
+`PUT /api/me` provisions or updates the application user from required claims in the validated access token (`email` and a display-name claim), then returns the same safe DTO. The client cannot supply the issuer, subject, or account identifier. A missing record on `GET /api/me` returns `404`; it is not implicitly created by a read.
+
+The first schema migration is `api/src/main/resources/db/migration/V1__create_app_user.sql`. Local startup reads database settings from the root `.env` file:
+
+```env
+POSTGRES_DB=tutorops
+POSTGRES_USER=tutorops
+POSTGRES_PASSWORD=replace-with-a-local-random-password
+TUTOROPS_DB_URL=jdbc:postgresql://localhost:5432/tutorops
+```
+
 ## CORS
 
 Because the frontend and API use different origins, the browser requires the API to approve cross-origin requests. The API allows the configured frontend origin, including preflight `OPTIONS` requests, and permits the headers needed for bearer-token calls:
@@ -184,16 +198,21 @@ Because the frontend and API use different origins, the browser requires the API
 
 Credentials/cookies are disabled. Authentication uses the bearer access token instead.
 
+CSRF protection is ignored for `/api/**` because those endpoints do not
+authenticate requests with cookies; state-changing API requests must carry a
+validated bearer access token in the `Authorization` header. CSRF protection
+remains enabled for non-API endpoints.
+
 ## Local startup
 
 1. Create local environment values from the examples. Do not commit real credentials.
 2. Start Keycloak from the repository root:
 
    ```bash
-   docker-compose up -d keycloak
+   docker compose up -d keycloak postgres
    ```
 
-3. Start the API from `api/`:
+3. Start the API from `api/` (Flyway runs during startup):
 
    ```bash
    ./mvnw spring-boot:run
