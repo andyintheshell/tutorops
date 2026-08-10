@@ -4,6 +4,9 @@ import java.time.Instant;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 import javax.crypto.spec.SecretKeySpec;
 
@@ -128,6 +131,12 @@ class StatusControllerIntegrationTest {
     }
 
     @Test
+    void putMeEndpointRequiresAuthentication() throws Exception {
+        mockMvc.perform(put("/api/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void putMeProvisionsAnAppUser() throws Exception {
         Jwt jwt = currentUserJwt("put-user");
 
@@ -140,6 +149,43 @@ class StatusControllerIntegrationTest {
                         appUserRepository.findByIssuerAndSubject(
                                 jwt.getIssuer().toString(), jwt.getSubject()))
                 .isPresent();
+    }
+
+    @Test
+    void concurrentPutMeRequestsProvisionOnlyOneAppUser() throws Exception {
+        Jwt jwt = currentUserJwt("concurrent-put-user");
+        int requestCount = 8;
+        CountDownLatch ready = new CountDownLatch(requestCount);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(requestCount)) {
+            List<Future<Integer>> responses = java.util.stream.IntStream.range(0, requestCount)
+                    .mapToObj(ignored -> executor.submit(() -> {
+                        ready.countDown();
+                        start.await();
+                        return mockMvc.perform(put("/api/me")
+                                        .with(SecurityMockMvcRequestPostProcessors.authentication(
+                                                new JwtAuthenticationToken(jwt, List.of()))))
+                                .andReturn()
+                                .getResponse()
+                                .getStatus();
+                    }))
+                    .toList();
+
+            ready.await();
+            start.countDown();
+
+            for (Future<Integer> response : responses) {
+                org.assertj.core.api.Assertions.assertThat(response.get()).isEqualTo(200);
+            }
+        }
+
+        org.assertj.core.api.Assertions.assertThat(appUserRepository
+                        .findAll().stream()
+                        .filter(user -> user.getIssuer().equals(jwt.getIssuer().toString()))
+                        .filter(user -> user.getSubject().equals(jwt.getSubject()))
+                        .count())
+                .isEqualTo(1);
     }
 
     private Jwt currentUserJwt() {

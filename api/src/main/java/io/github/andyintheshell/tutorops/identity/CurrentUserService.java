@@ -29,16 +29,12 @@ public class CurrentUserService {
     public AppUser findOrProvision(Jwt jwt) {
         String issuer = Objects.requireNonNull(jwt.getIssuer(), "JWT issuer is required").toString();
         String subject = requireClaim(jwt.getSubject());
+        String email = requiredClaim(jwt, "email");
+        String displayName = displayName(jwt);
 
-        AppUser appUser = appUserRepository.findByIssuerAndSubject(issuer, subject)
-                .orElseGet(() -> new AppUser(
-                        issuer,
-                        subject,
-                        requiredClaim(jwt, "email"),
-                        displayName(jwt)));
-
-        appUser.updateProfile(requiredClaim(jwt, "email"), displayName(jwt));
-        return appUserRepository.save(appUser);
+        appUserRepository.upsert(issuer, subject, email, displayName);
+        return appUserRepository.findByIssuerAndSubject(issuer, subject)
+                .orElseThrow(() -> new IllegalStateException("Provisioned user could not be found"));
     }
 
     private String displayName(Jwt jwt) {

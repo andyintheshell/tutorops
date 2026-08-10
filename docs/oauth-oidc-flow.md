@@ -198,9 +198,10 @@ Because the frontend and API use different origins, the browser requires the API
 
 Credentials/cookies are disabled. Authentication uses the bearer access token instead.
 
-The API disables cookie-based CSRF protection because it does not authenticate
-requests with cookies; state-changing requests must carry a validated bearer
-access token in the `Authorization` header.
+CSRF protection is ignored for `/api/**` because those endpoints do not
+authenticate requests with cookies; state-changing API requests must carry a
+validated bearer access token in the `Authorization` header. CSRF protection
+remains enabled for non-API endpoints.
 
 ## Local startup
 
