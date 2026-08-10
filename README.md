@@ -81,7 +81,7 @@ cd api
 ./mvnw spring-boot:run
 ```
 
-The API Dockerfile performs a full Maven verification during the image build and produces a small non-root runtime image:
+The API Dockerfile packages the application into a small non-root runtime image. Run the Maven verification lifecycle separately first because the integration tests use Testcontainers and cannot run inside the isolated Docker build stage:
 
 ```bash
 docker build --tag tutorops-api:local api
