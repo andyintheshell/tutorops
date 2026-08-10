@@ -24,7 +24,7 @@ ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL \
 RUN npm run build
 
 # The unprivileged image listens on 8080 and runs without root privileges.
-FROM nginxinc/nginx-unprivileged:1.29-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine3.24@sha256:334d92979f15aaecd5dd50af5105e1230e2bb70765d45b1e2f964e7c5eda81c3
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html

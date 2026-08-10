@@ -25,10 +25,10 @@ triage.
 | Repository SCA | Trivy | Main and weekly | Report-only baseline |
 | Secret scanning | Gitleaks | Pull request, main, weekly | Blocking |
 | Application SBOM | CycloneDX Maven Plugin | Every package build | Artifact generated |
-| Container image scanning | Trivy | Pull request and main | Blocks fixed high and critical findings |
-| Container SBOM | Trivy | Pull request and main | Artifact generated |
+| Container image scanning | Trivy | Pull request and main | Blocks fixed high and critical findings for API and web images |
+| Container SBOM | Trivy | Pull request and main | Artifact generated for API and web images |
 | Infrastructure-as-code scanning | Trivy config scanner | Pull request, main, weekly | Report-only baseline |
-| Container publishing | Docker CLI / GHCR | Merged main only, after checks | Blocking gate |
+| Container publishing | Docker CLI / GHCR | Merged main only, after checks | Blocking gate for verified API and web images |
 
 The container publishing gate resolves each required workflow by its file
 identity and validates the triggering workflow path, rather than trusting
